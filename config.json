@@ -1,0 +1,33 @@
+{
+  "watch_folders": {
+    "Amazon": "D:/TestDataAutomation/NBA/NBA Source Watch Folder/Amazon",
+    "ESPN": "D:/TestDataAutomation/NBA/NBA Source Watch Folder/ESPN",
+    "NBC": "D:/TestDataAutomation/NBA/NBA Source Watch Folder/NBC"
+  },
+  "destination_mapping": {
+    "Amazon": ["DestESPN", "DestNBU", "CLEAR", "NBAMedia", "Melt"],
+    "ESPN": ["DestAmazon", "DestNBU", "CLEAR", "NBAMedia", "Melt"],
+    "NBC": ["DestAmazon", "DestESPN", "CLEAR", "NBAMedia", "Melt"]
+  },
+  "destination_folders": {
+    "DestAmazon": "D:/TestDataAutomation/NBA/NBA Destination Watch Folder/DestAmazon",
+    "DestESPN": "D:/TestDataAutomation/NBA/NBA Destination Watch Folder/DestESPN",
+    "DestNBU": "D:/TestDataAutomation/NBA/NBA Destination Watch Folder/DestNBU",
+    "CLEAR": "D:/TestDataAutomation/NBA/NBA Destination Watch Folder/CLEAR",
+    "NBAMedia": "D:/TestDataAutomation/NBA/NBA Destination Watch Folder/NBAMedia",
+    "Melt": "D:/TestDataAutomation/NBA/NBA Destination Watch Folder/Melt"
+  },
+  "intervals": {
+    "validation_minutes": 2,
+    "report_minutes": 2,
+    "performance_report_minutes": 5
+  },
+  "alert_threshold_hours": 1,
+  "email": {
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 587,
+    "sender_email": "noreply.transfernotification@gmail.com",
+    "sender_password": "fkdd xwub tbnm unoh",
+    "recipients": ["debarsi.dey@primefocus.com", "noreply.transfernotification@gmail.com"]
+  }
+}
