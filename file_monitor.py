@@ -3,12 +3,13 @@ import json
 import time
 import shutil
 import smtplib
+import ssl
 import threading
 from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
+from email.mime.image import MIMEImage
+# Removed watchdog imports due to Python 3.13 compatibility issues
 from jinja2 import Template
 from openpyxl import Workbook, load_workbook
 from email.mime.base import MIMEBase
@@ -24,9 +25,14 @@ class FileMonitor:
         self.dropped_files = []
         self.transfer_log = []
         self.performance_tracking = {}  # Track each asset's transfer progress
+        self.performance_data = []  # Store performance analysis data
         self.running = True
         self.excel_file = 'NBA_Transfer_Performance.xlsx'
         self.serial_counter = 1
+        self.transfer_status_cache = {}  # Cache transfer status to detect changes
+        self.last_status_alert_time = datetime.now()  # Track last alert time
+        self.file_duplication_tracker = {}  # Track file duplications and overwrites
+        self.recent_alerts = {}  # Track recent alerts to prevent duplicates
         
         # Create directories if they don't exist
         for folder in self.config['watch_folders'].values():
@@ -63,7 +69,7 @@ class FileMonitor:
             return 'Image'
         elif ext in ['.mp3', '.wav', '.flac', '.aac']:
             return 'Audio'
-        elif ext in ['.txt', '.doc', '.docx', '.pdf']:
+        elif ext in ['.txt', '.doc', '.docx', '.pdf', '.xml']:
             return 'Document'
         else:
             return 'File'
@@ -141,7 +147,7 @@ class FileMonitor:
                 for dest_name in destinations:
                     transfer_time = data['destinations'].get(dest_name, 'In Progress')
                     
-                    if transfer_time != 'In Progress':
+                    if transfer_time != 'In Progress' and hasattr(transfer_time, 'strftime'):
                         time_diff = (transfer_time - data['upload_time']).total_seconds() / 60
                         time_analysis = f"{time_diff:.2f} minutes"
                         transfer_time_str = transfer_time.strftime('%Y-%m-%d %H:%M:%S')
@@ -181,12 +187,33 @@ class FileMonitor:
     
     def send_email(self, subject, body, alert_type="Alert", details=None, attach_excel=False):
         try:
+            # Rate limiting: prevent duplicate alerts within 30 seconds
+            alert_key = f"{subject}_{body[:50]}"
+            current_time = datetime.now()
+            if alert_key in self.recent_alerts:
+                time_diff = (current_time - self.recent_alerts[alert_key]).total_seconds()
+                if time_diff < 30:
+                    return
+            self.recent_alerts[alert_key] = current_time
+            
             if self.config['email']['sender_password'] == 'your_password':
                 print(f"EMAIL ALERT: {subject}\n{body}\n")
                 return
             
+            # Select appropriate template based on alert type
+            if "Transfer Monitoring Notification" in subject:
+                template_file = 'melts_transfer_report_template.html'
+            elif "Transfer Status" in subject:
+                template_file = 'transfer_status_template.html'
+            elif "Performance Report" in subject:
+                template_file = 'performance_report_template.html'
+            elif "Drop Alert Notification" in subject:
+                template_file = 'melts_drop_alert_template.html'
+            else:
+                template_file = 'email_template.html'
+            
             # Load and render HTML template
-            with open('email_template.html', 'r', encoding='utf-8') as f:
+            with open(template_file, 'r', encoding='utf-8') as f:
                 template = Template(f.read())
             
             alert_class = "danger" if "Alert" in alert_type else "info" if "Report" in alert_type else "success"
@@ -199,14 +226,48 @@ class FileMonitor:
                 details=details,
                 timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             )
-                
-            msg = MIMEMultipart('alternative')
-            msg['From'] = self.config['email']['sender_email']
-            msg['To'] = ', '.join(self.config['email']['recipients'])
-            msg['Subject'] = subject
             
-            msg.attach(MIMEText(body, 'plain', 'utf-8'))
-            msg.attach(MIMEText(html_content, 'html', 'utf-8'))
+            # Use 'related' only when attaching logo, otherwise use 'alternative'
+            if "Drop Alert Notification" in subject or "Transfer Monitoring Report" in subject or "Transfer Status" in subject or "Performance Report" in subject:
+                msg = MIMEMultipart('related')
+                msg['From'] = self.config['email']['sender_email']
+                msg['To'] = ', '.join(self.config['email']['recipients'])
+                msg['Subject'] = subject
+                
+                # Create alternative container for text and HTML
+                msg_alternative = MIMEMultipart('alternative')
+                msg_alternative.attach(MIMEText(body, 'plain', 'utf-8'))
+                msg_alternative.attach(MIMEText(html_content, 'html', 'utf-8'))
+                msg.attach(msg_alternative)
+                
+                # Attach appropriate logo based on email type
+                try:
+                    if "Performance Report" in subject:
+                        # Attach CLEAR NBA Logo for performance reports
+                        with open('CLEAR NBA Logo.png', 'rb') as f:
+                            img_data = f.read()
+                        image = MIMEImage(img_data)
+                        image.add_header('Content-ID', '<nba_logo>')
+                        image.add_header('Content-Disposition', 'inline', filename='nba_logo.png')
+                        msg.attach(image)
+                    else:
+                        # Attach CLEAR logo for other emails
+                        with open('CLEAR Logo.png', 'rb') as f:
+                            img_data = f.read()
+                        image = MIMEImage(img_data)
+                        image.add_header('Content-ID', '<clear_logo>')
+                        image.add_header('Content-Disposition', 'inline', filename='clear_logo.png')
+                        msg.attach(image)
+                except Exception as e:
+                    print(f"Failed to attach logo: {e}")
+            else:
+                msg = MIMEMultipart('alternative')
+                msg['From'] = self.config['email']['sender_email']
+                msg['To'] = ', '.join(self.config['email']['recipients'])
+                msg['Subject'] = subject
+                
+                msg.attach(MIMEText(body, 'plain', 'utf-8'))
+                msg.attach(MIMEText(html_content, 'html', 'utf-8'))
             
             # Attach Excel file if requested
             if attach_excel and os.path.exists(self.excel_file):
@@ -217,8 +278,9 @@ class FileMonitor:
                     part.add_header('Content-Disposition', f'attachment; filename="{self.excel_file}"')
                     msg.attach(part)
             
+            context = ssl.create_default_context()
             server = smtplib.SMTP(self.config['email']['smtp_server'], self.config['email']['smtp_port'])
-            server.starttls()
+            server.starttls(context=context)
             server.login(self.config['email']['sender_email'], self.config['email']['sender_password'])
             server.send_message(msg)
             server.quit()
@@ -228,108 +290,220 @@ class FileMonitor:
 
 
 
-class WatchHandler(FileSystemEventHandler):
-    def __init__(self, monitor, folder_name):
-        self.monitor = monitor
-        self.folder_name = folder_name
-
-    def on_created(self, event):
-        if not event.is_directory:
-            file_path = event.src_path
-        else:
-            file_path = event.src_path
+def polling_worker(monitor):
+    folder_snapshots = {}
+    processed_files = set()  # Track already processed files
+    
+    # Initialize snapshots
+    for folder_name, folder_path in monitor.config['watch_folders'].items():
+        folder_snapshots[folder_name] = set()
+        if os.path.exists(folder_path):
+            for root, dirs, files in os.walk(folder_path):
+                for item in files + dirs:
+                    item_path = os.path.join(root, item)
+                    folder_snapshots[folder_name].add(item_path)
+                    processed_files.add(item_path)  # Mark as already processed
+    
+    while monitor.running:
+        time.sleep(2)  # Check every 2 seconds
+        
+        for folder_name, folder_path in monitor.config['watch_folders'].items():
+            if not os.path.exists(folder_path):
+                continue
+                
+            current_items = set()
+            for root, dirs, files in os.walk(folder_path):
+                for item in files + dirs:
+                    item_path = os.path.join(root, item)
+                    current_items.add(item_path)
             
-        # Record the drop
-        file_count = 0
-        if os.path.isdir(file_path):
-            file_count = self.monitor.count_files_in_folder(file_path)
-            if file_count == 0:
-                # Send blank folder notification
-                self.monitor.send_email(
-                    "Blank Folder Alert",
-                    f"Blank folder detected:\nSource: {self.folder_name}\nFolder: {os.path.basename(file_path)}\nTime: {datetime.now()}"
+            # Check for new items
+            new_items = current_items - folder_snapshots[folder_name]
+            
+            for file_path in new_items:
+                if not os.path.exists(file_path) or file_path in processed_files:
+                    continue
+                processed_files.add(file_path)  # Mark as processed
+                    
+                # Record the drop
+                file_count = 0
+                if os.path.isdir(file_path):
+                    file_count = monitor.count_files_in_folder(file_path)
+                    if file_count == 0:
+                        monitor.send_email(
+                            "Blank Folder Alert",
+                            f"Blank folder detected:\nSource: {folder_name}\nFolder: {os.path.basename(file_path)}\nTime: {datetime.now()}"
+                        )
+                
+                drop_time = datetime.now()
+                asset_name = os.path.basename(file_path)
+                
+                # Check for file duplication/overwrite
+                duplication_key = f"{folder_name}_{asset_name}"
+                file_size = 0
+                try:
+                    if os.path.isfile(file_path):
+                        file_size = os.path.getsize(file_path)
+                except:
+                    file_size = 0
+                
+                # Track file duplication
+                if duplication_key in monitor.file_duplication_tracker:
+                    tracker = monitor.file_duplication_tracker[duplication_key]
+                    tracker['duplication_count'] += 1
+                    tracker['current_size'] = file_size
+                    tracker['current_drop_time'] = drop_time
+                    
+                    file_type = monitor.get_asset_type(asset_name) if os.path.isfile(file_path) else 'Folder'
+                    duplicate_version = f"V{tracker['duplication_count'] + 1}"
+                    
+                    duplication_alert = {
+                        'File Name': asset_name,
+                        'File Type': file_type,
+                        'Size of Previous File (bytes)': tracker['original_size'],
+                        'Size of Current File (bytes)': file_size,
+                        'Previous File Drop Time': tracker['original_drop_time'].strftime('%Y-%m-%d %H:%M:%S'),
+                        'Current File Drop Time': drop_time.strftime('%Y-%m-%d %H:%M:%S'),
+                        'Duplicate Version': duplicate_version,
+                        'Source Location': folder_name
+                    }
+                    
+                    monitor.send_email(
+                        "Transfer Status Alert - Immediate Action Required",
+                        f"Duplicate file detected: {asset_name} ({duplicate_version}) dropped in {folder_name} source folder.",
+                        "Transfer Status Alert",
+                        {'Duplicate File Detection': [duplication_alert]}
+                    )
+                else:
+                    monitor.file_duplication_tracker[duplication_key] = {
+                        'original_size': file_size,
+                        'original_drop_time': drop_time,
+                        'current_size': file_size,
+                        'current_drop_time': drop_time,
+                        'duplication_count': 0
+                    }
+                
+                monitor.dropped_files.append({
+                    'time': drop_time,
+                    'source_folder': folder_name,
+                    'asset_name': asset_name,
+                    'asset_type': 'folder' if os.path.isdir(file_path) else 'file',
+                    'file_count': file_count,
+                    'path': file_path
+                })
+                
+                monitor.track_asset_drop(asset_name, folder_name, drop_time, os.path.isdir(file_path))
+                
+                details = {
+                    'Source Folder': folder_name,
+                    'Asset Name': os.path.basename(file_path),
+                    'Asset Type': 'Folder' if os.path.isdir(file_path) else 'File',
+                    'File Count': file_count if os.path.isdir(file_path) else 1
+                }
+                
+                monitor.send_email(
+                    f"NBA MELTS Drop Alert Notification - {folder_name}",
+                    f"New {details['Asset Type'].lower()} detected in {folder_name} watch folder.",
+                    "NBA MELTS Drop Alert Notification",
+                    details
                 )
-        
-        drop_time = datetime.now()
-        asset_name = os.path.basename(file_path)
-        
-        self.monitor.dropped_files.append({
-            'time': drop_time,
-            'source_folder': self.folder_name,
-            'asset_name': asset_name,
-            'asset_type': 'folder' if os.path.isdir(file_path) else 'file',
-            'file_count': file_count,
-            'path': file_path
-        })
-        
-        # Track asset drop for performance monitoring
-        self.monitor.track_asset_drop(asset_name, self.folder_name, drop_time, os.path.isdir(file_path))
-        
-        # Send notification about file drop
-        details = {
-            'Source Folder': self.folder_name,
-            'Asset Name': os.path.basename(file_path),
-            'Asset Type': 'Folder' if os.path.isdir(file_path) else 'File',
-            'File Count': file_count if os.path.isdir(file_path) else 1
-        }
-        
-        self.monitor.send_email(
-            f"File Drop Alert - {self.folder_name}",
-            f"New {details['Asset Type'].lower()} detected in {self.folder_name} watch folder.",
-            "File Drop Alert",
-            details
-        )
+            
+            folder_snapshots[folder_name] = current_items
 
 def validation_worker(monitor):
     while monitor.running:
         time.sleep(monitor.config['intervals']['validation_minutes'] * 60)
         
-        # Check transfer status
-        for item in monitor.dropped_files:
-            if os.path.exists(item['path']):
-                source_folder = item['source_folder']
-                destinations = monitor.config['destination_mapping'][source_folder]
-                
-                transfer_status = {}
-                for dest_name in destinations:
-                    dest_path = monitor.config['destination_folders'][dest_name]
-                    expected_file = os.path.join(dest_path, item['asset_name'])
-                    transfer_status[dest_name] = os.path.exists(expected_file)
-                
-                # Send transfer status notification
-                status_msg = f"Transfer status for {item['asset_name']} from {source_folder}:"
-                transfer_times = {}
-                for dest, status in transfer_status.items():
-                    status_msg += f"\n{dest}: {'[OK] Transferred' if status else '[MISSING] Not Found'}"
-                    if status:
-                        transfer_time = datetime.now()
-                        transfer_times[dest] = transfer_time
-                        # Update performance tracking
-                        monitor.update_transfer_status(item['asset_name'], item['source_folder'], dest, transfer_time)
-                    else:
-                        # Mark as in progress
-                        monitor.update_transfer_status(item['asset_name'], item['source_folder'], dest)
-                
-                # Update performance data if transfers are complete
-                if all(transfer_status.values()):
-                    count = item['file_count'] if item['asset_type'] == 'folder' else 'NA'
-                    monitor.update_performance_data(
-                        item['asset_name'], 
-                        item['asset_type'].title(), 
-                        count, 
-                        item['time'], 
-                        transfer_times
-                    )
-                
-                monitor.send_email(
-                    f"Transfer Status - {item['asset_name']}",
-                    status_msg,
-                    "Transfer Status Report",
-                    transfer_status
-                )
+        current_time = datetime.now()
+        status_alerts = []
+        immediate_alerts = []
         
-        # Check for files older than threshold
-        threshold = datetime.now() - timedelta(hours=monitor.config['alert_threshold_hours'])
+        # Check transfer status for all dropped files
+        for item in monitor.dropped_files:
+            asset_key = f"{item['source_folder']}_{item['asset_name']}"
+            source_exists = os.path.exists(item['path'])
+            time_since_drop = (current_time - item['time']).total_seconds() / 60  # minutes
+            
+            destinations = monitor.config['destination_mapping'][item['source_folder']]
+            
+            for dest_name in destinations:
+                dest_path = monitor.config['destination_folders'][dest_name]
+                expected_file = os.path.join(dest_path, item['asset_name'])
+                dest_exists = os.path.exists(expected_file)
+                
+                # Determine status and RCA
+                status = 'Pending'
+                rca = 'Monitoring'
+                alert_type = 'scheduled'
+                
+                if dest_exists:
+                    status = 'Transferred'
+                    rca = 'Successfully Completed'
+                    # Only update transfer time if not already recorded
+                    if (asset_key in monitor.performance_tracking and 
+                        dest_name not in monitor.performance_tracking[asset_key]['destinations']):
+                        transfer_time = datetime.now()
+                        monitor.update_transfer_status(item['asset_name'], item['source_folder'], dest_name, transfer_time)
+                elif source_exists and time_since_drop > monitor.config['transfer_status_thresholds']['no_transfer_threshold_minutes'] and not dest_exists:
+                    status = 'Failed'
+                    rca = 'Transfer Failed - File Present in Source but Not Transferred'
+                    alert_type = 'immediate'
+                elif source_exists and time_since_drop > monitor.config['transfer_status_thresholds']['transfer_progress_threshold_minutes'] and not dest_exists:
+                    # Check for intermittent transfer failure
+                    if asset_key in monitor.transfer_status_cache and monitor.transfer_status_cache[asset_key].get(dest_name) == 'In Progress':
+                        status = 'Failed'
+                        rca = 'Intermittent Transfer Failure - Transfer was in progress but failed'
+                        alert_type = 'immediate'
+                    else:
+                        status = 'In Progress'
+                        rca = 'Transfer in Progress'
+                        alert_type = 'immediate'
+                        # Cache the in-progress status
+                        if asset_key not in monitor.transfer_status_cache:
+                            monitor.transfer_status_cache[asset_key] = {}
+                        monitor.transfer_status_cache[asset_key][dest_name] = 'In Progress'
+                
+                # Create alert entry if conditions are met
+                if status in ['Failed', 'In Progress'] and rca != 'Successfully Completed':
+                    alert_entry = {
+                        'Asset Name': item['asset_name'],
+                        'Asset Type': item['asset_type'].title(),
+                        'Source Location': item['source_folder'],
+                        'Destination Location': dest_name,
+                        'Status': status,
+                        'Root Cause Analysis': rca,
+                        'Duration (minutes)': f"{time_since_drop:.1f}",
+                        'Drop Time': item['time'].strftime('%Y-%m-%d %H:%M:%S'),
+                        'Log Analysis': f"Source exists: {source_exists}, Destination exists: {dest_exists}, Time elapsed: {time_since_drop:.1f} min"
+                    }
+                    
+                    if alert_type == 'immediate':
+                        immediate_alerts.append(alert_entry)
+                    else:
+                        status_alerts.append(alert_entry)
+        
+        # Send immediate alerts
+        if immediate_alerts:
+            monitor.send_email(
+                "Transfer Status Alert - Immediate Action Required",
+                f"Critical transfer issues detected for {len(immediate_alerts)} assets requiring immediate attention.",
+                "Transfer Status Alert",
+                {'Transfer Status Details': immediate_alerts}
+            )
+        
+        # Send scheduled alerts every 15 minutes
+        time_since_last_alert = (current_time - monitor.last_status_alert_time).total_seconds() / 60
+        if status_alerts and time_since_last_alert >= monitor.config['intervals']['transfer_status_alert_minutes']:
+            monitor.send_email(
+                "Transfer Status Alert - Scheduled Check",
+                f"Transfer status issues detected for {len(status_alerts)} assets during scheduled monitoring.",
+                "Transfer Status Report",
+                {'Transfer Status Details': status_alerts}
+            )
+            monitor.last_status_alert_time = current_time
+        
+        # Check for files older than threshold (keep existing functionality)
+        threshold = datetime.now() - timedelta(hours=monitor.config.get('alert_threshold_hours', 1))
         for item in monitor.dropped_files:
             if item['time'] < threshold and os.path.exists(item['path']):
                 details = {
@@ -353,23 +527,25 @@ def report_worker(monitor):
         dropped_summary = []
         for folder_name in monitor.config['watch_folders'].keys():
             folder_drops = [f for f in monitor.dropped_files if f['source_folder'] == folder_name]
-            dropped_summary.append({'Source Folder': folder_name, 'Items Dropped': len(folder_drops)})
+            dropped_summary.append({'Source': folder_name, 'Files Count': len(folder_drops)})
         
         dest_counts = []
+        total_transfers = 0
         for dest_name, dest_path in monitor.config['destination_folders'].items():
             count = monitor.count_files_in_folder(dest_path)
-            dest_counts.append({'Destination Folder': dest_name, 'File Count': count})
+            dest_counts.append({'Destination': dest_name, 'Files Count': count})
+            total_transfers += count
         
         # Create structured details for HTML template
         report_details = {
-            'Dropped Files Summary': dropped_summary,
-            'Destination Folder Counts': dest_counts,
-            'Total Transfers': len(monitor.transfer_log)
+            'Dropped Files Summary Count at Source': dropped_summary,
+            'Transferred Files Summary Count at Destination': dest_counts,
+            'Total Transfers': total_transfers
         }
         
-        report_body = f"NBA Monitor Report - {len(monitor.dropped_files)} total items monitored, {len(monitor.transfer_log)} transfers completed."
+        report_body = f"NBA Asset Transfer Monitoring Details - {len(monitor.dropped_files)} total items monitored, {total_transfers} transfers completed."
         
-        monitor.send_email("NBA Monitor Report", report_body, "Monitor Report", report_details)
+        monitor.send_email("NBA MELTS Transfer Monitoring Notification", report_body, "Monitor Report", report_details)
 
 def performance_report_worker(monitor):
     while monitor.running:
@@ -406,18 +582,23 @@ def performance_report_worker(monitor):
 def main():
     monitor = FileMonitor()
     
-    # Start validation and report workers
-    threading.Thread(target=validation_worker, args=(monitor,), daemon=True).start()
-    threading.Thread(target=report_worker, args=(monitor,), daemon=True).start()
-    threading.Thread(target=performance_report_worker, args=(monitor,), daemon=True).start()
+    # Start all worker threads
+    validation_thread = threading.Thread(target=validation_worker, args=(monitor,))
+    validation_thread.daemon = True
+    validation_thread.start()
     
-    # Setup file watchers
-    observer = Observer()
-    for folder_name, folder_path in monitor.config['watch_folders'].items():
-        handler = WatchHandler(monitor, folder_name)
-        observer.schedule(handler, folder_path, recursive=True)
+    report_thread = threading.Thread(target=report_worker, args=(monitor,))
+    report_thread.daemon = True
+    report_thread.start()
     
-    observer.start()
+    performance_thread = threading.Thread(target=performance_report_worker, args=(monitor,))
+    performance_thread.daemon = True
+    performance_thread.start()
+    
+    polling_thread = threading.Thread(target=polling_worker, args=(monitor,))
+    polling_thread.daemon = True
+    polling_thread.start()
+    
     print("NBA File Monitor started...")
     
     try:
@@ -425,9 +606,6 @@ def main():
             time.sleep(1)
     except KeyboardInterrupt:
         monitor.running = False
-        observer.stop()
-    
-    observer.join()
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transfer Status Report</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #4a148c 0%, #7b1fa2 100%);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 650px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #6a1b9a 0%, #8e24aa 100%);
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-family: Arial, sans-serif;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 20px;
+        }
+        
+        .logo-section {
+            text-align: center;
+            padding: 15px 0;
+            background: #fff;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .logo-section img {
+            max-width: 200px;
+            height: auto;
+        }
+        
+        .status-summary {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid #9c27b0;
+        }
+        
+        .status-summary h3 {
+            font-family: Arial, sans-serif;
+            color: #6a1b9a;
+            font-size: 18px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        
+        .status-summary p {
+            color: #333;
+            font-size: 14px;
+        }
+        
+
+        
+        .data-section {
+            background: #f9f9f9;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            border: 1px solid #ddd;
+        }
+        
+        .data-section h4 {
+            font-family: Arial, sans-serif;
+            color: #4a148c;
+            font-size: 16px;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 5px 0;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        th {
+            background: linear-gradient(135deg, #6a1b9a 0%, #8e24aa 100%);
+            color: white;
+            padding: 8px 6px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 11px;
+        }
+        
+        td {
+            padding: 6px;
+            border-bottom: 1px solid #e0e0e0;
+            background: white;
+            font-size: 12px;
+        }
+        
+        tr:nth-child(even) td {
+            background: #f8f9fa;
+        }
+        
+        .status-indicator {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+        
+        .status-transferred {
+            background: #c8e6c9;
+            color: #2e7d32;
+        }
+        
+        .status-progress {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+        
+        .status-source {
+            background: #ffcdd2;
+            color: #c62828;
+        }
+        
+        .status-deleted {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+        
+        .status-failed {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        .timestamp-section {
+            background: #e3f2fd;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 15px 0;
+            text-align: center;
+        }
+        
+        .footer {
+            background: #263238;
+            padding: 15px;
+            text-align: center;
+            color: white;
+        }
+        
+        .footer h3 {
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .copyright {
+            background: #1a1a1a;
+            padding: 12px;
+            text-align: center;
+            color: #888;
+            font-size: 11px;
+        }
+        
+        @media (max-width: 600px) {
+            .container { margin: 10px; }
+            .content, .header { padding: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Transfer Status Report</h1>
+            <p>Real-time Asset Transfer Monitoring</p>
+        </div>
+        
+        <div class="content">
+            <div class="logo-section">
+                <img src="cid:clear_logo" alt="CLEAR Logo" />
+            </div>
+            
+            <div class="status-summary">
+                <h3>Current Transfer Status</h3>
+                <p>{{ message }}</p>
+            </div>
+            
+            {% if details %}
+                {% for section_name, section_data in details.items() %}
+                    <div class="data-section">
+                        {% if section_data is iterable and section_data is not string %}
+                            <h4>📊 {{ section_name }}</h4>
+                            <table>
+                                {% if section_data %}
+                                    <tr>
+                                        {% for key in section_data[0].keys() %}
+                                            <th>{{ key }}</th>
+                                        {% endfor %}
+                                    </tr>
+                                    {% for row in section_data %}
+                                    <tr>
+                                        {% for value in row.values() %}
+                                            <td>
+                                                {% if 'Transferred' in value|string %}
+                                                    <span class="status-indicator status-transferred">{{ value }}</span>
+                                                {% elif 'In Progress' in value|string %}
+                                                    <span class="status-indicator status-progress">{{ value }}</span>
+                                                {% elif 'Failed' in value|string %}
+                                                    <span class="status-indicator status-failed">{{ value }}</span>
+                                                {% elif 'Present In Source' in value|string %}
+                                                    <span class="status-indicator status-source">{{ value }}</span>
+                                                {% elif 'Deleted from Source' in value|string %}
+                                                    <span class="status-indicator status-deleted">{{ value }}</span>
+                                                {% else %}
+                                                    {{ value }}
+                                                {% endif %}
+                                            </td>
+                                        {% endfor %}
+                                    </tr>
+                                    {% endfor %}
+                                {% endif %}
+                            </table>
+                        {% else %}
+                            <p><strong>{{ section_name }}:</strong> {{ section_data }}</p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            {% endif %}
+            
+            <div class="timestamp-section">
+                <strong>Status Checked:</strong> {{ timestamp }}
+            </div>
+        </div>
+        
+        <div class="footer">
+            <h3>Transfer Status Monitoring System</h3>
+        </div>
+        
+        <div class="copyright">
+            <p>© 2025 Prime Focus Technologies PVT. LTD. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

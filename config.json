@@ -18,16 +18,21 @@
     "Melt": "D:/TestDataAutomation/NBA/NBA Destination Watch Folder/Melt"
   },
   "intervals": {
-    "validation_minutes": 2,
+    "validation_minutes": 1,
     "report_minutes": 2,
-    "performance_report_minutes": 5
+    "performance_report_minutes": 4,
+    "transfer_status_alert_minutes": 15
   },
   "alert_threshold_hours": 1,
+  "transfer_status_thresholds": {
+    "no_transfer_threshold_minutes": 5,
+    "transfer_progress_threshold_minutes": 30
+  },
   "email": {
     "smtp_server": "smtp.gmail.com",
     "smtp_port": 587,
     "sender_email": "noreply.transfernotification@gmail.com",
     "sender_password": "fkdd xwub tbnm unoh",
-    "recipients": ["debarsi.dey@primefocus.com", "noreply.transfernotification@gmail.com"]
+    "recipients": ["debarsi.dey@primefocus.com", "noreply.transfernotification@gmail.com", "goutam.rana@primefocus.com"]
   }
 }
