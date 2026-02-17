@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MELTS Drop Alert Notification</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #1565c0 0%, #1976d2 100%);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .alert-header {
+            background: linear-gradient(135deg, #1565c0 0%, #1976d2 100%);
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }
+        
+        .alert-header h1 {
+            font-family: Arial, sans-serif;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        
+        .alert-header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 25px;
+        }
+        
+        .logo-section {
+            text-align: center;
+            padding: 20px 0;
+            background: #fff;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .logo-section img {
+            max-width: 200px;
+            height: auto;
+        }
+        
+        .alert-message {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #1976d2;
+        }
+        
+        .alert-message h3 {
+            font-family: Arial, sans-serif;
+            color: #1565c0;
+            font-size: 18px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        
+        .alert-message p {
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .urgent-notice {
+            background: #fff;
+            color: #000;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: center;
+            font-weight: bold;
+            border: 2px solid #1976d2;
+        }
+        
+        .asset-details {
+            background: #f9f9f9;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid #ddd;
+        }
+        
+        .asset-details h4 {
+            font-family: Arial, sans-serif;
+            color: #1565c0;
+            font-size: 16px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        
+        .detail-item {
+            background: #fff;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .detail-item strong {
+            color: #333;
+            display: block;
+            margin-bottom: 3px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .detail-item span {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .action-required {
+            background: #fff;
+            border: 2px dashed #1976d2;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .action-required h4 {
+            font-family: Arial, sans-serif;
+            color: #1565c0;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        
+        .timestamp-section {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .footer {
+            background: #263238;
+            padding: 20px;
+            text-align: center;
+            color: white;
+        }
+        
+        .footer h3 {
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .copyright {
+            background: #1a1a1a;
+            padding: 15px;
+            text-align: center;
+            color: #888;
+            font-size: 12px;
+        }
+        
+        @media (max-width: 600px) {
+            .container { margin: 10px; }
+            .content, .alert-header { padding: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="alert-header">
+            <h1>MELTS Drop Alert Notification</h1>
+            <p>The Asset is dropped in the Source location</p>
+        </div>
+        
+        <div class="content">
+            <div class="logo-section">
+                <img src="cid:clear_logo" alt="CLEAR Logo" />
+            </div>
+            
+            <div class="alert-message">
+                <h3>Alert Details</h3>
+                <p><strong>Subject:</strong> {{ subject }}</p>
+                <p><strong>Message:</strong> {{ message }}</p>
+            </div>
+            
+            <div class="urgent-notice">
+                NEW ASSET DETECTED
+            </div>
+            
+            {% if details %}
+                <div class="asset-details">
+                    <h4>Asset Information</h4>
+                    {% for key, value in details.items() %}
+                        <div class="detail-item">
+                            <strong>{{ key }}</strong>
+                            <span>{{ value }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            
+            <div class="action-required">
+                <h4>Next Steps</h4>
+                <p>Verify asset transfer and monitor destination folders for completion.</p>
+            </div>
+            
+            <div class="timestamp-section">
+                <strong>Alert Generated:</strong> {{ timestamp }}
+            </div>
+        </div>
+        
+        <div class="footer">
+            <h3>MELTS Drop Alert System</h3>
+        </div>
+        
+        <div class="copyright">
+            <p>© 2025 Prime Focus Technologies PVT. LTD. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

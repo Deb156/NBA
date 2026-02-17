@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NBA MELTS Transfer Monitoring Report</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #0f4c75 0%, #3282b8 100%);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-family: Arial, sans-serif;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 20px;
+        }
+        
+        .logo-section {
+            text-align: center;
+            padding: 15px 0;
+            background: #fff;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .logo-section img {
+            max-width: 200px;
+            height: auto;
+        }
+        
+        .report-summary {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 2px solid #2196f3;
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.2);
+        }
+        
+        .report-summary h3 {
+            font-family: Arial, sans-serif;
+            color: #1565c0;
+            font-size: 18px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        
+        .data-section {
+            background: #f9f9f9;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            border: 2px solid #1e3c72;
+            box-shadow: 0 4px 12px rgba(30, 60, 114, 0.15);
+        }
+        
+        .data-section h4 {
+            font-family: Arial, sans-serif;
+            color: #1e3c72;
+            font-size: 16px;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 5px 0;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        th {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 8px 6px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 11px;
+        }
+        
+        td {
+            padding: 6px;
+            border-bottom: 1px solid #e0e0e0;
+            background: white;
+            font-size: 12px;
+        }
+        
+        tr:nth-child(even) td {
+            background: #f8f9fa;
+        }
+        
+        .timestamp-section {
+            background: #e3f2fd;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 15px 0;
+            text-align: center;
+        }
+        
+        .footer {
+            background: #263238;
+            padding: 15px;
+            text-align: center;
+            color: white;
+        }
+        
+        .footer h3 {
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .copyright {
+            background: #1a1a1a;
+            padding: 12px;
+            text-align: center;
+            color: #888;
+            font-size: 11px;
+        }
+        
+        @media (max-width: 600px) {
+            .container { margin: 10px; }
+            .content, .header { padding: 20px; }
+            .social-links { flex-direction: column; align-items: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏀 NBA MELTS Transfer Monitoring Report</h1>
+            <p>Comprehensive Asset Transfer Analysis</p>
+        </div>
+        
+        <div class="content">
+            <div class="logo-section">
+                <img src="cid:clear_logo" alt="CLEAR Logo" />
+            </div>
+            
+            <div class="report-summary">
+                <h3>📈 Transfer Summary</h3>
+                <p>{{ message }}</p>
+            </div>
+            
+            {% if details %}
+                {% for section_name, section_data in details.items() %}
+                    <div class="data-section">
+                        {% if section_data is iterable and section_data is not string %}
+                            <h4>📋 {{ section_name }}</h4>
+                            <table>
+                                {% if section_data %}
+                                    <tr>
+                                        {% for key in section_data[0].keys() %}
+                                            <th>{{ key }}</th>
+                                        {% endfor %}
+                                    </tr>
+                                    {% for row in section_data %}
+                                    <tr>
+                                        {% for value in row.values() %}
+                                            <td>{{ value }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    {% endfor %}
+                                {% endif %}
+                            </table>
+                        {% else %}
+                            <p><strong>{{ section_name }}:</strong> {{ section_data }}</p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            {% endif %}
+            
+            <div class="timestamp-section">
+                <strong>🕒 Report Generated:</strong> {{ timestamp }}
+            </div>
+        </div>
+        
+        <div class="footer">
+            <h3>Stay Connected</h3>
+        </div>
+        
+        <div class="copyright">
+            <p>🏀 NBA MELTS Transfer Monitoring System</p>
+            <p>© 2025 Prime Focus Technologies PVT. LTD. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
