@@ -4,7 +4,7 @@ A Python script that monitors watch folders and handles automated file transfers
 
 ## Setup
 1. Install dependencies: `pip install -r requirements.txt`
-2. Configure `config.json` with your folder paths and email settings
+2. Configure `nbamonitorconfig.json` with your folder paths and email settings
 3. Run: `python run.py`
 
 ## Features
@@ -16,7 +16,7 @@ A Python script that monitors watch folders and handles automated file transfers
 - Stuck file alerts (>1 hour)
 
 ## Configuration
-Edit `config.json` to set:
+Edit `nbamonitorconfig.json` to set:
 - Watch folder paths
 - Destination folder paths  
 - Email settings
